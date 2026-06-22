@@ -3,133 +3,62 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>天气壁纸</title>
+<title>天气面板</title>
+<link rel="stylesheet" href="style.css">
 <style>
-  :root { color-scheme: dark; }
-  html, body {
-    margin: 0; padding: 0;
-    width: 100%; height: 100%;
-    background: #000;
-    overflow: hidden;
-    font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', 'PingFang SC', sans-serif;
-  }
-  .layer {
-    position: fixed; inset: 0;
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    opacity: 0;
-    transition: opacity 1.5s ease-in-out;
-    will-change: opacity;
-  }
-  .layer.show { opacity: 1; }
-  .layer.fade { opacity: 0; }
+  html, body { margin:0; padding:0; height:100%; background:transparent; overflow:hidden; }
+  body { display:flex; align-items:flex-start; justify-content:flex-end; padding:24px; box-sizing:border-box; }
 
-  /* ── 天气面板：iOS/macOS 极简风格 ── */
+  /* ── 天气面板（独立模块）── */
   .weather {
-    position: fixed; top: 24px; right: 24px;
-    min-width: 240px;
-    padding: 20px 24px 16px;
-    color: #fff;
-    background: rgba(0,0,0,.25);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-radius: 16px;
-    box-shadow: 0 4px 30px rgba(0,0,0,.3);
-    z-index: 10;
+    min-width: 220px;
+    padding: 18px 22px 14px;
+    color: var(--text-primary);
     user-select: none;
   }
 
-  /* 当前天气 */
   .weather .now {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 10px;
+    margin-bottom: 14px;
   }
-  .weather .now .icon {
-    font-size: 44px;
-    line-height: 1;
-    flex-shrink: 0;
-  }
+  .weather .now .icon { font-size: 40px; line-height:1; flex-shrink:0; }
   .weather .now .temp {
-    font-size: 52px;
-    font-weight: 300;
-    letter-spacing: -2px;
-    line-height: 1;
+    font-size: 48px; font-weight:300; letter-spacing:-2px; line-height:1;
   }
-  .weather .now .temp .unit {
-    font-size: 22px;
-    font-weight: 300;
-    vertical-align: super;
-    margin-left: 2px;
-  }
-  .weather .now .desc {
-    font-size: 13px;
-    font-weight: 400;
-    color: rgba(255,255,255,.8);
-    margin-top: 2px;
-  }
+  .weather .now .temp .unit { font-size:20px; font-weight:300; vertical-align:super; margin-left:2px; }
+  .weather .now .desc  { font-size:13px; font-weight:400; color:var(--text-secondary); margin-top:2px; }
 
-  /* 细节行 */
   .weather .detail {
-    display: flex;
-    gap: 20px;
-    font-size: 12px;
-    color: rgba(255,255,255,.65);
-    margin-bottom: 18px;
-    padding-bottom: 14px;
-    border-bottom: 1px solid rgba(255,255,255,.12);
+    display: flex; gap: 16px;
+    font-size: 12px; color: var(--text-tertiary);
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-glass);
   }
-  .weather .detail span { white-space: nowrap; }
 
-  /* 3天预报 */
   .weather .daily {
-    display: flex;
-    justify-content: space-between;
+    display: flex; justify-content: space-between;
   }
-  .weather .daily .day {
-    text-align: center;
-    flex: 1;
-  }
-  .weather .daily .day .name {
-    font-size: 12px;
-    color: rgba(255,255,255,.6);
-    margin-bottom: 4px;
-  }
-  .weather .daily .day .d-icon {
-    font-size: 22px;
-    margin-bottom: 2px;
-  }
-  .weather .daily .day .d-temp {
-    font-size: 13px;
-    font-weight: 400;
-  }
-  .weather .daily .day .d-temp .hi { color: #fff; }
-  .weather .daily .day .d-temp .lo { color: rgba(255,255,255,.5); margin-left: 4px; }
+  .weather .daily .day { text-align:center; flex:1; }
+  .weather .daily .day .name  { font-size:12px; color:var(--text-secondary); margin-bottom:4px; }
+  .weather .daily .day .d-icon { font-size:20px; margin-bottom:2px; }
+  .weather .daily .day .d-temp { font-size:13px; font-weight:400; }
+  .weather .daily .day .d-temp .hi { color:var(--text-primary); }
+  .weather .daily .day .d-temp .lo { color:var(--text-tertiary); margin-left:4px; }
 
-  /* 加载状态 */
-  .loading {
-    position: fixed; inset: 0;
-    display: flex; align-items: center; justify-content: center;
-    color: rgba(255,255,255,.3); font-size: 13px; z-index: 20;
-  }
-  .loading.hide { display: none; }
-
-  body.idle { cursor: none; }
+  .weather.loading .now .temp { opacity:.3; }
+  .weather.loading .daily { opacity:.3; }
 </style>
 </head>
-<body class="idle">
-
-<div id="bg" class="layer show"></div>
-<div class="loading" id="loading">加载天气…</div>
-
-<div class="weather" id="weather" style="display:none">
+<body>
+<div class="weather glass" id="weather">
   <div class="now">
     <div class="icon" id="w-icon">☀️</div>
     <div>
       <div class="temp" id="w-temp">--<span class="unit">°</span></div>
-      <div class="desc" id="w-desc">获取中</div>
+      <div class="desc" id="w-desc">加载中</div>
     </div>
   </div>
   <div class="detail">
@@ -145,156 +74,56 @@
 </div>
 
 <script>
-(() => {
-  const LAT = 39.9042, LON = 116.4074;
-  const REFRESH_MS = 30 * 60 * 1000;  // 30 分钟
+// ── WMO 天气码 → 图标 + 中文描述 ──
+const WMO = {
+  0:['☀️','晴'],1:['🌤️','少云'],2:['⛅','多云'],3:['☁️','阴'],
+  45:['🌫️','雾'],48:['🌫️','雾凇'],
+  51:['🌦️','小毛毛雨'],53:['🌦️','毛毛雨'],55:['🌦️','大毛毛雨'],
+  56:['🌧️','冻毛毛雨'],57:['🌧️','冻毛毛雨'],
+  61:['🌦️','小雨'],63:['🌧️','中雨'],65:['🌧️','大雨'],
+  66:['🌧️','冻雨'],67:['🌧️','冻雨'],
+  71:['🌨️','小雪'],73:['🌨️','中雪'],75:['🌨️','大雪'],77:['❄️','雪粒'],
+  80:['🌦️','阵雨'],81:['🌧️','中阵雨'],82:['🌧️','大阵雨'],
+  85:['🌨️','小阵雪'],86:['🌨️','大阵雪'],
+  95:['⛈️','雷暴'],96:['⛈️','雷暴+冰雹'],99:['⛈️','雷暴+冰雹'],
+};
+const WEEKDAY = ['周日','周一','周二','周三','周四','周五','周六'];
 
-  const bgEl = document.getElementById('bg');
-  const loadEl = document.getElementById('loading');
-  const wxEl = document.getElementById('weather');
+async function fetchWeather() {
+  const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=39.9042&longitude=116.4074&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weather_code&forecast_days=3&timezone=Asia/Shanghai`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
 
-  // 壁纸索引，防止每次刷新都换图
-  let bgIdx = +(localStorage.getItem('wx_bg_idx') || 0);
+function renderWeather(d, el) {
+  const cur = d.current;
+  const daily = d.daily;
+  const [icon, desc] = WMO[cur.weather_code] || ['🌈','未知'];
 
-  // ── WMO 天气码 → 图标 + 中文描述 ──
-  const WMO = {
-    0:  ['☀️', '晴'],
-    1:  ['🌤️', '少云'],
-    2:  ['⛅', '多云'],
-    3:  ['☁️', '阴'],
-    45: ['🌫️', '雾'],
-    48: ['🌫️', '雾凇'],
-    51: ['🌦️', '小毛毛雨'],
-    53: ['🌦️', '毛毛雨'],
-    55: ['🌦️', '大毛毛雨'],
-    56: ['🌧️', '冻毛毛雨'],
-    57: ['🌧️', '冻毛毛雨'],
-    61: ['🌦️', '小雨'],
-    63: ['🌧️', '中雨'],
-    65: ['🌧️', '大雨'],
-    66: ['🌧️', '冻雨'],
-    67: ['🌧️', '冻雨'],
-    71: ['🌨️', '小雪'],
-    73: ['🌨️', '中雪'],
-    75: ['🌨️', '大雪'],
-    77: ['❄️', '雪粒'],
-    80: ['🌦️', '阵雨'],
-    81: ['🌧️', '中阵雨'],
-    82: ['🌧️', '大阵雨'],
-    85: ['🌨️', '小阵雪'],
-    86: ['🌨️', '大阵雪'],
-    95: ['⛈️', '雷暴'],
-    96: ['⛈️', '雷暴+冰雹'],
-    99: ['⛈️', '雷暴+冰雹'],
-  };
-  function wxInfo(code) { return WMO[code] || ['🌈', '未知']; }
+  el.querySelector('#w-icon').textContent = icon;
+  el.querySelector('#w-temp').innerHTML = Math.round(cur.temperature_2m) + '<span class="unit">°</span>';
+  el.querySelector('#w-desc').textContent = desc;
+  el.querySelector('#w-feel').textContent = `体感 ${Math.round(cur.apparent_temperature)}°`;
+  el.querySelector('#w-humid').textContent = `💧 ${cur.relative_humidity_2m}%`;
+  el.querySelector('#w-wind').textContent = `💨 ${cur.wind_speed_10m} km/h`;
 
-  // ── 星期名 ──
-  const WEEKDAY = ['周日','周一','周二','周三','周四','周五','周六'];
-
-  // ── 获取天气 ──
-  async function fetchWeather() {
-    const url = `https://api.open-meteo.com/v1/forecast`
-      + `?latitude=${LAT}&longitude=${LON}`
-      + `&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m`
-      + `&daily=temperature_2m_max,temperature_2m_min,weather_code`
-      + `&forecast_days=3&timezone=Asia/Shanghai`;
-    const r = await fetch(url);
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json();
+  const days = el.querySelectorAll('#w-daily .day');
+  const today = new Date();
+  for (let i = 0; i < 3; i++) {
+    const day = days[i]; if (!day) continue;
+    const [dIcon, dDesc] = WMO[daily.weather_code[i]] || ['🌈',''];
+    day.querySelector('.name').textContent = i === 0 ? '今天' : i === 1 ? '明天' : WEEKDAY[(today.getDay() + i) % 7];
+    day.querySelector('.d-icon').textContent = dIcon;
+    day.querySelector('.hi').textContent = Math.round(daily.temperature_2m_max[i]) + '°';
+    day.querySelector('.lo').textContent = Math.round(daily.temperature_2m_min[i]) + '°';
   }
+  el.classList.remove('loading');
+}
 
-  function renderWeather(d) {
-    const cur = d.current;
-    const daily = d.daily;
-    const [icon, desc] = wxInfo(cur.weather_code);
-
-    // 当前
-    document.getElementById('w-icon').textContent = icon;
-    document.getElementById('w-temp').innerHTML = Math.round(cur.temperature_2m) + '<span class="unit">°</span>';
-    document.getElementById('w-desc').textContent = desc;
-    document.getElementById('w-feel').textContent = `体感 ${Math.round(cur.apparent_temperature)}°`;
-    document.getElementById('w-humid').textContent = `💧 ${cur.relative_humidity_2m}%`;
-    document.getElementById('w-wind').textContent = `💨 ${cur.wind_speed_10m} km/h`;
-
-    // 3 天预报
-    const days = document.querySelectorAll('#w-daily .day');
-    const today = new Date();
-    for (let i = 0; i < 3; i++) {
-      const dayEl = days[i];
-      if (!dayEl) continue;
-      const [dIcon, dDesc] = wxInfo(daily.weather_code[i]);
-      const name = i === 0 ? '今天' : i === 1 ? '明天' : WEEKDAY[(today.getDay() + i) % 7];
-      dayEl.querySelector('.name').textContent = name;
-      dayEl.querySelector('.d-icon').textContent = dIcon;
-      dayEl.querySelector('.hi').textContent = Math.round(daily.temperature_2m_max[i]) + '°';
-      dayEl.querySelector('.lo').textContent = Math.round(daily.temperature_2m_min[i]) + '°';
-    }
-
-    wxEl.style.display = 'block';
-  }
-
-  // ── 加载壁纸 ──
-  async function loadBg() {
-    try {
-      const r = await fetch('https://bing.npanuhin.me/CN-zh.json');
-      const imgs = await r.json();
-      if (Array.isArray(imgs) && imgs.length) {
-        bgIdx = (bgIdx + 1) % imgs.length;
-        localStorage.setItem('wx_bg_idx', bgIdx);
-        const img = imgs[bgIdx];
-        const url = img.url || img.bing_url || '';
-        if (url) {
-          bgEl.style.backgroundImage = `url("${url.replace(/"/g,'\\"')}")`;
-        }
-      }
-    } catch (e) {
-      // 壁纸加载失败不阻塞天气
-    }
-  }
-
-  // ── 启动 ──
-  (async () => {
-    // 先加载壁纸
-    await loadBg();
-
-    // 首次获取天气
-    try {
-      const data = await fetchWeather();
-      renderWeather(data);
-      loadEl.classList.add('hide');
-    } catch (e) {
-      loadEl.textContent = '天气加载失败';
-    }
-
-    // 每 30 分钟刷新天气
-    setInterval(async () => {
-      try {
-        const data = await fetchWeather();
-        renderWeather(data);
-      } catch (e) {
-        // 静默失败，下次继续
-      }
-    }, REFRESH_MS);
-
-    // 壁纸每 30 分钟同步换一张
-    setInterval(loadBg, REFRESH_MS);
-
-    // 也支持手动换壁纸（点击图片区域）
-    document.addEventListener('click', (e) => {
-      if (e.target.closest('.weather')) return;  // 点击天气面板不换
-      loadBg();
-    });
-  })();
-
-  // ── 鼠标闲置隐藏光标 ──
-  let curTimer = null;
-  document.addEventListener('mousemove', () => {
-    document.body.classList.remove('idle');
-    clearTimeout(curTimer);
-    curTimer = setTimeout(() => document.body.classList.add('idle'), 5000);
-  }, { passive: true });
-})();
+// 自动初始化
+const el = document.getElementById('weather');
+fetchWeather().then(d => renderWeather(d, el)).catch(() => { el.querySelector('#w-desc').textContent = '暂无数据'; el.classList.remove('loading'); });
+setInterval(() => fetchWeather().then(d => renderWeather(d, el)).catch(() => {}), 30 * 60 * 1000);
 </script>
 </body>
 </html>

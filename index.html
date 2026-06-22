@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Screen Saver</title>
+<link rel="stylesheet" href="style.css">
 <style>
-  :root { color-scheme: dark; }
   html, body {
     margin: 0; padding: 0;
     width: 100%; height: 100%;
@@ -24,26 +24,56 @@
   }
   .layer.show { opacity: 1; }
 
+  /* ── 拍摄信息（底部居中）── */
   .info {
     position: fixed; left: 50%; bottom: 32px;
     transform: translateX(-50%);
     max-width: min(80%, 1200px);
-    padding: 12px 22px;
-    color: #fff;
+    padding: 10px 20px;
+    color: var(--text-primary);
     font-size: 15px;
     text-align: center;
-    text-shadow: 0 1px 6px rgba(0,0,0,.9);
-    background: rgba(0,0,0,.35);
-    backdrop-filter: blur(6px);
-    border-radius: 10px;
+    z-index: 10;
     opacity: 0;
     transition: opacity 1s;
     pointer-events: none;
   }
   .info.show { opacity: 1; }
-  .info .date { color: #ffd479; font-weight: 500; display: block; margin-bottom: 4px; }
-  .info .loc { font-size: 16px; line-height: 1.4; }
-  .info .cap { font-size: 13px; color: rgba(255,255,255,.7); margin-top: 4px; }
+  .info .date { color: var(--accent); font-weight: 500; display: block; margin-bottom: 4px; }
+  .info .loc  { font-size: 16px; line-height: 1.4; }
+  .info .cap  { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+
+  /* ── 天气面板（右上角）── */
+  .weather-glass {
+    position: fixed; top: 24px; right: 24px;
+    z-index: 10;
+    min-width: 200px;
+    padding: 16px 20px 12px;
+    color: var(--text-primary);
+    user-select: none;
+  }
+  .weather-glass .now {
+    display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px;
+  }
+  .weather-glass .now .icon { font-size: 36px; line-height:1; flex-shrink:0; }
+  .weather-glass .now .temp  { font-size: 42px; font-weight:300; letter-spacing:-1px; line-height:1; }
+  .weather-glass .now .temp .unit { font-size:18px; font-weight:300; vertical-align:super; margin-left:1px; }
+  .weather-glass .now .desc { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+  .weather-glass .detail {
+    display: flex; gap: 14px;
+    font-size: 11px; color: var(--text-tertiary);
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-glass);
+  }
+  .weather-glass .daily { display: flex; justify-content: space-between; }
+  .weather-glass .daily .day { text-align:center; flex:1; }
+  .weather-glass .daily .day .name  { font-size:11px; color:var(--text-secondary); margin-bottom:3px; }
+  .weather-glass .daily .day .d-icon { font-size:18px; margin-bottom:1px; }
+  .weather-glass .daily .day .d-temp { font-size:12px; }
+  .weather-glass .daily .day .d-temp .hi { color:var(--text-primary); }
+  .weather-glass .daily .day .d-temp .lo { color:var(--text-tertiary); margin-left:3px; }
+  .weather-glass.loading .now .temp, .weather-glass.loading .daily { opacity:.3; }
 
   .status {
     position: fixed; inset: 0;
@@ -57,9 +87,9 @@
   /* 调试指示器（?debug=1 显示） */
   .tick {
     display: none;
-    position: fixed; top: 16px; right: 16px;
+    position: fixed; top: 16px; left: 16px;
     color: rgba(255,255,255,.2); font-size: 11px;
-    font-family: monospace;
+    font-family: var(--font-mono);
     z-index: 999; pointer-events: none;
   }
   .tick.show { display: block; }
@@ -74,6 +104,27 @@
 <div id="error" class="status" style="color:#888;display:none"></div>
 <div id="tick" class="tick"></div>
 
+<!-- 天气面板 -->
+<div id="weather" class="weather-glass glass loading">
+  <div class="now">
+    <div class="icon" id="w-icon">☀️</div>
+    <div>
+      <div class="temp" id="w-temp">--<span class="unit">°</span></div>
+      <div class="desc" id="w-desc">加载中</div>
+    </div>
+  </div>
+  <div class="detail">
+    <span id="w-feel">体感 --°</span>
+    <span id="w-humid">💧 --%</span>
+    <span id="w-wind">💨 -- km/h</span>
+  </div>
+  <div class="daily" id="w-daily">
+    <div class="day"><div class="name">今天</div><div class="d-icon">☀️</div><div class="d-temp"><span class="hi">--°</span><span class="lo">--°</span></div></div>
+    <div class="day"><div class="name">明天</div><div class="d-icon">☀️</div><div class="d-temp"><span class="hi">--°</span><span class="lo">--°</span></div></div>
+    <div class="day"><div class="name">后天</div><div class="d-icon">☀️</div><div class="d-temp"><span class="hi">--°</span><span class="lo">--°</span></div></div>
+  </div>
+</div>
+
 <script>
 (() => {
   const P = new URLSearchParams(location.search);
@@ -81,7 +132,7 @@
   const REGION = P.get('region') || '';                                    // 指定存档区域时仅拉取该区域（CN-zh / US-en / JP-ja…）
   const LIMIT = Math.max(0, parseInt(P.get('count')) || 0);               // 0=全部
   const FADE = Math.max(0, parseInt(P.get('fade')) || 1500);              // 淡入淡出（ms）
-  const INFO_MS = parseInt(P.get('info_ms')) || 8000;                     // 版权浮层显示时长（ms）
+  const INFO_MS = parseInt(P.get('info_ms')) || 8000;                     // 信息浮层显示时长（ms）
   const SHOW_INFO = P.get('info') !== '0';
   const CURSOR_IDLE = parseInt(P.get('cursor_idle')) || 5000;             // 隐藏光标闲置时间（ms）
   const NO_FS = P.get('nofs') === '1';                                    // 1=禁用全屏请求
@@ -91,6 +142,7 @@
   const loadEl = document.getElementById('loading');
   const errEl = document.getElementById('error');
   const tickEl = document.getElementById('tick');
+  const wxEl = document.getElementById('weather');
   let active = 0, idx = 0, timer = null, infoTimer = null, images = [];
   let tickCount = 0;
   const DEBUG = P.get('debug') === '1';
@@ -107,8 +159,7 @@
     document.addEventListener('keydown', enterFs, { once: true });
   }
 
-  // ── 数据源：bing.npanuhin.me 完整存档（12 个地区，数千张壁纸）──
-  // 默认拉取全部地区合并去重；?region=CN-zh 可指定单一区域
+  // ── 壁纸数据源 ──
   const ALL_REGIONS = [
     'CN-zh','US-en','JP-ja','GB-en','DE-de','FR-fr',
     'IT-it','ES-es','BR-pt','IN-en','CA-en','CA-fr',
@@ -122,17 +173,14 @@
     return a;
   }
 
-  // 从 bing_url 提取唯一图片名（如 OHR.KilchurnAutumn），用于跨区去重
   function imageKey(img) {
-    const m = (img.bing_url || '').match(/id=OHR\.([^_]+)/);
+    const m = (img.bing_url || '').match(/id=OHR\\.([^_]+)/);
     return m ? m[1] : img.date || img.url || '';
   }
 
   async function fetchImages() {
     const regions = REGION ? [REGION] : ALL_REGIONS;
     const failures = [];
-
-    // 并行拉取所有地区
     const results = await Promise.allSettled(
       regions.map(r =>
         fetch(`https://bing.npanuhin.me/${r}.json`, { cache: 'no-store' })
@@ -140,8 +188,6 @@
           .then(data => { if (!Array.isArray(data) || !data.length) throw new Error(`${r} 空数据`); return data; })
       )
     );
-
-    // 合并去重
     const seen = new Set();
     let all = [];
     for (const r of results) {
@@ -154,18 +200,11 @@
         failures.push(r.reason?.message || '未知错误');
       }
     }
-
-    if (all.length) {
-      shuffle(all);
-      return LIMIT > 0 ? all.slice(0, LIMIT) : all;
-    }
-
+    if (all.length) { shuffle(all); return LIMIT > 0 ? all.slice(0, LIMIT) : all; }
     throw new Error('壁纸加载失败: ' + failures.join('; '));
   }
 
-  function imageUrl(img) {
-    return img.url || img.bing_url || '';
-  }
+  function imageUrl(img) { return img.url || img.bing_url || ''; }
 
   function applyBg(el, url) {
     el.style.backgroundImage = 'url("' + url.replace(/"/g, '\\"') + '")';
@@ -187,7 +226,6 @@
     imgLoader.onerror = () => setTimeout(() => showAt(i + 1), 5000);
     imgLoader.src = url;
 
-    // 显示拍摄信息：日期 + 地点 + 简介
     if (SHOW_INFO) {
       const date = img.date || '';
       const loc = (img.title || '').trim();
@@ -212,7 +250,6 @@
   function nextKey()  { idx++; showAt(idx); updateTick('→'); }
   function prevKey()  { idx--; showAt(idx); updateTick('←'); }
 
-  // ── 状态更新（调试用，?debug=1 显示）──
   function updateTick(src) {
     if (!DEBUG) return;
     tickCount++;
@@ -223,14 +260,57 @@
     tickEl._hide = setTimeout(() => tickEl.classList.remove('show'), 4000);
   }
 
-  // ── 键盘快捷键：← 上一张  → 下一张（测试用）──
-  // 全屏 keydown 是 { once: true }，不影响这里
+  // ── 键盘快捷键 ──
   document.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowRight') { e.preventDefault(); nextKey(); }
     if (e.key === 'ArrowLeft')  { e.preventDefault(); prevKey(); }
   });
 
-  // ── 启动 ──
+  // ── 天气──
+  const WMO = {
+    0:['☀️','晴'],1:['🌤️','少云'],2:['⛅','多云'],3:['☁️','阴'],
+    45:['🌫️','雾'],48:['🌫️','雾凇'],
+    51:['🌦️','小毛毛雨'],53:['🌦️','毛毛雨'],55:['🌦️','大毛毛雨'],
+    56:['🌧️','冻毛毛雨'],57:['🌧️','冻毛毛雨'],
+    61:['🌦️','小雨'],63:['🌧️','中雨'],65:['🌧️','大雨'],
+    66:['🌧️','冻雨'],67:['🌧️','冻雨'],
+    71:['🌨️','小雪'],73:['🌨️','中雪'],75:['🌨️','大雪'],77:['❄️','雪粒'],
+    80:['🌦️','阵雨'],81:['🌧️','中阵雨'],82:['🌧️','大阵雨'],
+    85:['🌨️','小阵雪'],86:['🌨️','大阵雪'],
+    95:['⛈️','雷暴'],96:['⛈️','雷暴+冰雹'],99:['⛈️','雷暴+冰雹'],
+  };
+  const WEEKDAY = ['周日','周一','周二','周三','周四','周五','周六'];
+
+  async function fetchWeather() {
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=39.9042&longitude=116.4074&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weather_code&forecast_days=3&timezone=Asia/Shanghai`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  }
+
+  function renderWeather(d) {
+    const cur = d.current;
+    const daily = d.daily;
+    const [icon, desc] = WMO[cur.weather_code] || ['🌈','未知'];
+    document.getElementById('w-icon').textContent = icon;
+    document.getElementById('w-temp').innerHTML = Math.round(cur.temperature_2m) + '<span class="unit">°</span>';
+    document.getElementById('w-desc').textContent = desc;
+    document.getElementById('w-feel').textContent = `体感 ${Math.round(cur.apparent_temperature)}°`;
+    document.getElementById('w-humid').textContent = `💧 ${cur.relative_humidity_2m}%`;
+    document.getElementById('w-wind').textContent = `💨 ${cur.wind_speed_10m} km/h`;
+    const days = document.querySelectorAll('#w-daily .day');
+    const today = new Date();
+    for (let i = 0; i < 3; i++) {
+      const day = days[i]; if (!day) continue;
+      const [dIcon] = WMO[daily.weather_code[i]] || ['🌈'];
+      day.querySelector('.name').textContent = i === 0 ? '今天' : i === 1 ? '明天' : WEEKDAY[(today.getDay() + i) % 7];
+      day.querySelector('.d-icon').textContent = dIcon;
+      day.querySelector('.hi').textContent = Math.round(daily.temperature_2m_max[i]) + '°';
+      day.querySelector('.lo').textContent = Math.round(daily.temperature_2m_min[i]) + '°';
+    }
+    wxEl.classList.remove('loading');
+  }
+
+  // ── 启动壁纸 ──
   (async () => {
     try {
       images = await fetchImages();
@@ -243,6 +323,10 @@
       errEl.textContent = '壁纸加载失败: ' + e.message;
     }
   })();
+
+  // ── 启动天气 ──
+  fetchWeather().then(renderWeather).catch(() => { document.getElementById('w-desc').textContent = '暂无数据'; wxEl.classList.remove('loading'); });
+  setInterval(() => fetchWeather().then(renderWeather).catch(() => {}), 30 * 60 * 1000);
 
   // ── 鼠标闲置隐藏光标 ──
   let curTimer = null;
