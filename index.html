@@ -89,7 +89,7 @@
   const P = new URLSearchParams(location.search);
   const INTERVAL = Math.max(5, parseInt(P.get('interval')) || 600) * 1000;  // 切换间隔（秒）
   const REGION = P.get('region') || '';                                    // 指定存档区域时仅拉取该区域（CN-zh / US-en / JP-ja…）
-  const LIMIT = Math.max(1, parseInt(P.get('count')) || 0);               // 0=全部
+  const LIMIT = Math.max(0, parseInt(P.get('count')) || 0);               // 0=全部
   const FADE = Math.max(0, parseInt(P.get('fade')) || 1500);              // 淡入淡出（ms）
   const INFO_MS = parseInt(P.get('info_ms')) || 8000;                     // 版权浮层显示时长（ms）
   const SHOW_INFO = P.get('info') !== '0';
