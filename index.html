@@ -41,7 +41,9 @@
     pointer-events: none;
   }
   .info.show { opacity: 1; }
-  .info .date { color: #ffd479; margin-right: 12px; font-weight: 500; }
+  .info .date { color: #ffd479; font-weight: 500; display: block; margin-bottom: 4px; }
+  .info .loc { font-size: 16px; line-height: 1.4; }
+  .info .cap { font-size: 13px; color: rgba(255,255,255,.7); margin-top: 4px; }
 
   .status {
     position: fixed; inset: 0;
@@ -52,26 +54,15 @@
 
   body.idle { cursor: none; }
 
-  /* 状态指示 — 调试用 */
+  /* 调试指示器（?debug=1 显示） */
   .tick {
-    position: fixed; top: 16px; left: 16px;
-    color: rgba(255,255,255,.25); font-size: 11px;
+    display: none;
+    position: fixed; top: 16px; right: 16px;
+    color: rgba(255,255,255,.2); font-size: 11px;
     font-family: monospace;
     z-index: 999; pointer-events: none;
-    opacity: 0; transition: opacity .5s;
   }
-  .tick.show { opacity: 1; }
-
-  /* 全屏提示 — 点击后消失 */
-  .fs-hint {
-    position: fixed; top: 16px; right: 16px;
-    color: rgba(255,255,255,.5); font-size: 12px;
-    background: rgba(0,0,0,.3);
-    padding: 6px 12px; border-radius: 6px;
-    opacity: 1; transition: opacity .8s;
-    z-index: 999; pointer-events: none;
-  }
-  .fs-hint.hide { opacity: 0; }
+  .tick.show { display: block; }
 </style>
 </head>
 <body class="idle">
@@ -82,7 +73,6 @@
 <div id="loading" class="status">加载壁纸…</div>
 <div id="error" class="status" style="color:#888;display:none"></div>
 <div id="tick" class="tick"></div>
-<div id="fs-hint" class="fs-hint">点击进入全屏</div>
 
 <script>
 (() => {
@@ -100,10 +90,10 @@
   const infoEl = document.getElementById('info');
   const loadEl = document.getElementById('loading');
   const errEl = document.getElementById('error');
-  const fsHint = document.getElementById('fs-hint');
   const tickEl = document.getElementById('tick');
   let active = 0, idx = 0, timer = null, infoTimer = null, images = [];
   let tickCount = 0;
+  const DEBUG = P.get('debug') === '1';
 
   // ── 设置过渡时间（CSS 和 JS 同步）──
   bg.forEach(el => el.style.transitionDuration = FADE + 'ms');
@@ -112,17 +102,9 @@
   if (!NO_FS && !document.fullscreenElement) {
     const enterFs = () => {
       document.documentElement.requestFullscreen().catch(() => {});
-      fsHint.classList.add('hide');
     };
-    // 第一次点击/按键即全屏
     document.addEventListener('click', enterFs, { once: true });
     document.addEventListener('keydown', enterFs, { once: true });
-    // 如果已经全屏则隐藏提示
-    document.addEventListener('fullscreenchange', () => {
-      if (document.fullscreenElement) fsHint.classList.add('hide');
-    }, { once: true });
-  } else {
-    fsHint.classList.add('hide');
   }
 
   // ── 数据源：bing.npanuhin.me 完整存档（12 个地区，数千张壁纸）──
@@ -175,9 +157,6 @@
 
     if (all.length) {
       shuffle(all);
-      // 暴露图片数量用于调试
-      window.__ssCount = all.length;
-      window.__ssFirst5 = all.slice(0,5).map(x => ({date: x.date, url: (x.url||'').slice(0,80), bing: (x.bing_url||'').slice(0,80)}));
       return LIMIT > 0 ? all.slice(0, LIMIT) : all;
     }
 
@@ -185,9 +164,7 @@
   }
 
   function imageUrl(img) {
-    // npanuhin.me CDN 在国内可直接访问，bing.com 可能被墙
-    window.__ssUrl = img.url || img.bing_url || '';
-    return window.__ssUrl;
+    return img.url || img.bing_url || '';
   }
 
   function applyBg(el, url) {
@@ -195,7 +172,6 @@
   }
 
   function showAt(i) {
-    window.__ssIdx = i;
     if (!images.length) return;
     const img = images[((i % images.length) + images.length) % images.length];
     const url = imageUrl(img);
@@ -211,11 +187,15 @@
     imgLoader.onerror = () => setTimeout(() => showAt(i + 1), 5000);
     imgLoader.src = url;
 
-    // 显示版权信息
+    // 显示拍摄信息：日期 + 地点 + 简介
     if (SHOW_INFO) {
       const date = img.date || '';
-      const cp = (img.copyright || img.title || '').trim();
-      const html = (date ? `<span class="date">${date}</span>` : '') + (cp ? `<span>${cp}</span>` : '');
+      const loc = (img.title || '').trim();
+      const cap = (img.caption || '').trim();
+      let html = '';
+      if (date) html += `<span class="date">${date}</span>`;
+      if (loc) html += `<div class="loc">${loc}</div>`;
+      if (cap) html += `<div class="cap">${cap}</div>`;
       if (html) {
         infoEl.innerHTML = html;
         infoEl.classList.add('show');
@@ -232,14 +212,15 @@
   function nextKey()  { idx++; showAt(idx); updateTick('→'); }
   function prevKey()  { idx--; showAt(idx); updateTick('←'); }
 
-  // ── 状态更新 ──
+  // ── 状态更新（调试用，?debug=1 显示）──
   function updateTick(src) {
+    if (!DEBUG) return;
     tickCount++;
     const intSec = Math.round(INTERVAL / 1000);
-    tickEl.textContent = `${src} #${idx} (${tickCount}) interval=${intSec}s`;
+    tickEl.textContent = `${src} #${idx} (${tickCount}) ${intSec}s`;
     tickEl.classList.add('show');
     clearTimeout(tickEl._hide);
-    tickEl._hide = setTimeout(() => tickEl.classList.remove('show'), 6000);
+    tickEl._hide = setTimeout(() => tickEl.classList.remove('show'), 4000);
   }
 
   // ── 键盘快捷键：← 上一张  → 下一张（测试用）──
@@ -253,8 +234,6 @@
   (async () => {
     try {
       images = await fetchImages();
-      // 暴露给全局用于调试
-      window.__ssImages = images;
       loadEl.classList.add('hide');
       showAt(0); updateTick('✓');
       timer = setInterval(nextAuto, INTERVAL);
