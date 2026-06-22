@@ -4,7 +4,7 @@
    ═══════════════════════════════════════ */
 
 :root {
-  --glass-bg:      rgba(0,0,0,.15);
+  --glass-opacity: 0.65;
   --glass-blur:    20px;
   --glass-radius:  16px;
   --glass-shadow:  0 4px 30px rgba(0,0,0,.3);
@@ -19,9 +19,9 @@
 
 /* ── 毛玻璃面板 ── */
 .glass {
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
+  background: transparent;
+  backdrop-filter: opacity(var(--glass-opacity)) blur(var(--glass-blur));
+  -webkit-backdrop-filter: opacity(var(--glass-opacity)) blur(var(--glass-blur));
   border-radius: var(--glass-radius);
   box-shadow: var(--glass-shadow);
 }
