@@ -177,6 +177,7 @@
       shuffle(all);
       // 暴露图片数量用于调试
       window.__ssCount = all.length;
+      window.__ssFirst5 = all.slice(0,5).map(x => ({date: x.date, url: (x.url||'').slice(0,80), bing: (x.bing_url||'').slice(0,80)}));
       return LIMIT > 0 ? all.slice(0, LIMIT) : all;
     }
 
@@ -252,6 +253,8 @@
   (async () => {
     try {
       images = await fetchImages();
+      // 暴露给全局用于调试
+      window.__ssImages = images;
       loadEl.classList.add('hide');
       showAt(0); updateTick('✓');
       timer = setInterval(nextAuto, INTERVAL);
