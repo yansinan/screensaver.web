@@ -52,6 +52,16 @@
 
   body.idle { cursor: none; }
 
+  /* 状态指示 — 调试用 */
+  .tick {
+    position: fixed; top: 16px; left: 16px;
+    color: rgba(255,255,255,.25); font-size: 11px;
+    font-family: monospace;
+    z-index: 999; pointer-events: none;
+    opacity: 0; transition: opacity .5s;
+  }
+  .tick.show { opacity: 1; }
+
   /* 全屏提示 — 点击后消失 */
   .fs-hint {
     position: fixed; top: 16px; right: 16px;
@@ -71,6 +81,7 @@
 <div id="info" class="info"></div>
 <div id="loading" class="status">加载壁纸…</div>
 <div id="error" class="status" style="color:#888;display:none"></div>
+<div id="tick" class="tick"></div>
 <div id="fs-hint" class="fs-hint">点击进入全屏</div>
 
 <script>
@@ -90,7 +101,9 @@
   const loadEl = document.getElementById('loading');
   const errEl = document.getElementById('error');
   const fsHint = document.getElementById('fs-hint');
+  const tickEl = document.getElementById('tick');
   let active = 0, idx = 0, timer = null, infoTimer = null, images = [];
+  let tickCount = 0;
 
   // ── 设置过渡时间（CSS 和 JS 同步）──
   bg.forEach(el => el.style.transitionDuration = FADE + 'ms');
@@ -211,11 +224,25 @@
   function next() { idx++; showAt(idx); }
   function prev() { idx--; showAt(idx); }
 
+  function nextAuto() { idx++; showAt(idx); updateTick('⏱'); }
+  function nextKey()  { idx++; showAt(idx); updateTick('→'); }
+  function prevKey()  { idx--; showAt(idx); updateTick('←'); }
+
+  // ── 状态更新 ──
+  function updateTick(src) {
+    tickCount++;
+    const intSec = Math.round(INTERVAL / 1000);
+    tickEl.textContent = `${src} #${idx} (${tickCount}) interval=${intSec}s`;
+    tickEl.classList.add('show');
+    clearTimeout(tickEl._hide);
+    tickEl._hide = setTimeout(() => tickEl.classList.remove('show'), 6000);
+  }
+
   // ── 键盘快捷键：← 上一张  → 下一张（测试用）──
   // 全屏 keydown 是 { once: true }，不影响这里
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
-    if (e.key === 'ArrowLeft')  { e.preventDefault(); prev(); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); nextKey(); }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); prevKey(); }
   });
 
   // ── 启动 ──
@@ -223,8 +250,8 @@
     try {
       images = await fetchImages();
       loadEl.classList.add('hide');
-      showAt(0);
-      timer = setInterval(next, INTERVAL);
+      showAt(0); updateTick('✓');
+      timer = setInterval(nextAuto, INTERVAL);
     } catch (e) {
       loadEl.classList.add('hide');
       errEl.style.display = 'flex';
