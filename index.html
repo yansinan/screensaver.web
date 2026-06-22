@@ -77,7 +77,7 @@
 (() => {
   const P = new URLSearchParams(location.search);
   const INTERVAL = Math.max(5, parseInt(P.get('interval')) || 600) * 1000;  // 切换间隔（秒）
-  const REGION = P.get('region') || 'CN-zh';                              // 存档区域（CN-zh / US-en / JP-ja…）
+  const REGION = P.get('region') || '';                                    // 指定存档区域时仅拉取该区域（CN-zh / US-en / JP-ja…）
   const LIMIT = Math.max(1, parseInt(P.get('count')) || 0);               // 0=全部
   const FADE = Math.max(0, parseInt(P.get('fade')) || 1500);              // 淡入淡出（ms）
   const INFO_MS = parseInt(P.get('info_ms')) || 8000;                     // 版权浮层显示时长（ms）
@@ -112,8 +112,13 @@
     fsHint.classList.add('hide');
   }
 
-  // ── 数据源：bing.npanuhin.me 完整存档（813 张，2024 至今）──
-  // 无 CORS 问题，直接 fetch 即可
+  // ── 数据源：bing.npanuhin.me 完整存档（12 个地区，数千张壁纸）──
+  // 默认拉取全部地区合并去重；?region=CN-zh 可指定单一区域
+  const ALL_REGIONS = [
+    'CN-zh','US-en','JP-ja','GB-en','DE-de','FR-fr',
+    'IT-it','ES-es','BR-pt','IN-en','CA-en','CA-fr',
+  ];
+
   function shuffle(a) {
     for (let i = a.length - 1; i > 0; i--) {
       const j = Math.random() * (i + 1) | 0;
@@ -122,25 +127,51 @@
     return a;
   }
 
+  // 从 bing_url 提取唯一图片名（如 OHR.KilchurnAutumn），用于跨区去重
+  function imageKey(img) {
+    const m = (img.bing_url || '').match(/id=OHR\.([^_]+)/);
+    return m ? m[1] : img.date || img.url || '';
+  }
+
   async function fetchImages() {
-    // 优先从网络拉取
-    try {
-      const r = await fetch(`https://bing.npanuhin.me/${REGION}.json`, { cache: 'no-store' });
-      if (r.ok) {
-        const d = await r.json();
-        if (Array.isArray(d) && d.length) {
-          shuffle(d);
-          localStorage.setItem('ss_imgs', JSON.stringify(d));
-          return LIMIT > 0 ? d.slice(0, LIMIT) : d;
+    const regions = REGION ? [REGION] : ALL_REGIONS;
+    const failures = [];
+
+    // 并行拉取所有地区
+    const results = await Promise.allSettled(
+      regions.map(r =>
+        fetch(`https://bing.npanuhin.me/${r}.json`, { cache: 'no-store' })
+          .then(res => { if (!res.ok) throw new Error(`${r} HTTP ${res.status}`); return res.json(); })
+          .then(data => { if (!Array.isArray(data) || !data.length) throw new Error(`${r} 空数据`); return data; })
+      )
+    );
+
+    // 合并去重
+    const seen = new Set();
+    let all = [];
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        for (const img of r.value) {
+          const key = imageKey(img);
+          if (!seen.has(key)) { seen.add(key); all.push(img); }
         }
+      } else {
+        failures.push(r.reason?.message || '未知错误');
       }
-    } catch (e) {}
+    }
+
+    if (all.length) {
+      shuffle(all);
+      localStorage.setItem('ss_imgs', JSON.stringify(all));
+      return LIMIT > 0 ? all.slice(0, LIMIT) : all;
+    }
+
     // 兜底：localStorage 缓存
     try {
       const c = localStorage.getItem('ss_imgs');
       if (c) { const d = JSON.parse(c); if (d.length) return d; }
     } catch (e) {}
-    throw new Error('壁纸加载失败');
+    throw new Error('壁纸加载失败: ' + failures.join('; '));
   }
 
   function imageUrl(img) {
