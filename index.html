@@ -175,6 +175,8 @@
 
     if (all.length) {
       shuffle(all);
+      // 暴露图片数量用于调试
+      window.__ssCount = all.length;
       return LIMIT > 0 ? all.slice(0, LIMIT) : all;
     }
 
@@ -183,7 +185,8 @@
 
   function imageUrl(img) {
     // npanuhin.me CDN 在国内可直接访问，bing.com 可能被墙
-    return img.url || img.bing_url || '';
+    window.__ssUrl = img.url || img.bing_url || '';
+    return window.__ssUrl;
   }
 
   function applyBg(el, url) {
@@ -191,6 +194,7 @@
   }
 
   function showAt(i) {
+    window.__ssIdx = i;
     if (!images.length) return;
     const img = images[((i % images.length) + images.length) % images.length];
     const url = imageUrl(img);
