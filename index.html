@@ -182,9 +182,8 @@
   }
 
   function imageUrl(img) {
-    // bing_url 已是完整 4K 地址，无需拼接
-    // 例：https://bing.com/th?id=OHR.EggDad_ZH-CN6045387630_UHD.jpg
-    return img.bing_url || img.url || '';
+    // npanuhin.me CDN 在国内可直接访问，bing.com 可能被墙
+    return img.url || img.bing_url || '';
   }
 
   function applyBg(el, url) {
