@@ -209,6 +209,14 @@
   }
 
   function next() { idx++; showAt(idx); }
+  function prev() { idx--; showAt(idx); }
+
+  // ── 键盘快捷键：← 上一张  → 下一张（测试用）──
+  // 全屏 keydown 是 { once: true }，不影响这里
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); prev(); }
+  });
 
   // ── 启动 ──
   (async () => {
