@@ -162,15 +162,9 @@
 
     if (all.length) {
       shuffle(all);
-      localStorage.setItem('ss_imgs', JSON.stringify(all));
       return LIMIT > 0 ? all.slice(0, LIMIT) : all;
     }
 
-    // 兜底：localStorage 缓存
-    try {
-      const c = localStorage.getItem('ss_imgs');
-      if (c) { const d = JSON.parse(c); if (d.length) return d; }
-    } catch (e) {}
     throw new Error('壁纸加载失败: ' + failures.join('; '));
   }
 
