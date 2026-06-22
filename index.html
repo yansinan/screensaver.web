@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Screen Saver</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    background: #000;
+    overflow: hidden;
+  }
+  .layer {
+    position: fixed; inset: 0;
+    background-color: #000;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0;
+    transition: opacity 1.5s ease-in-out;
+    will-change: opacity;
+  }
+  .layer.show { opacity: 1; }
+
+  .info {
+    position: fixed; left: 50%; bottom: 32px;
+    transform: translateX(-50%);
+    max-width: min(80%, 1200px);
+    padding: 12px 22px;
+    color: #fff;
+    font-size: 15px;
+    text-align: center;
+    text-shadow: 0 1px 6px rgba(0,0,0,.9);
+    background: rgba(0,0,0,.35);
+    backdrop-filter: blur(6px);
+    border-radius: 10px;
+    opacity: 0;
+    transition: opacity 1s;
+    pointer-events: none;
+  }
+  .info.show { opacity: 1; }
+  .info .date { color: #ffd479; margin-right: 12px; font-weight: 500; }
+
+  .status {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #555; font-size: 13px;
+  }
+  .status.hide { display: none; }
+
+  body.idle { cursor: none; }
+</style>
+</head>
+<body class="idle">
+
+<div id="bg1" class="layer"></div>
+<div id="bg2" class="layer"></div>
+<div id="info" class="info"></div>
+<div id="loading" class="status">加载壁纸…</div>
+<div id="error" class="status" style="color:#888;display:none"></div>
+
+<script>
+(() => {
+  const P = new URLSearchParams(location.search);
+  const INTERVAL = Math.max(5, parseInt(P.get('interval')) || 600) * 1000;
+  const REGION = P.get('region') || 'zh-CN';
+  const COUNT = Math.min(15, Math.max(1, parseInt(P.get('count')) || 8));
+  const FADE = Math.max(0, parseInt(P.get('fade')) || 1500);
+  const INFO_MS = parseInt(P.get('info_ms')) || 8000;
+  const SHOW_INFO = P.get('info') !== '0';
+  const CURSOR_IDLE = parseInt(P.get('cursor_idle')) || 5000;
+
+  const bg = [document.getElementById('bg1'), document.getElementById('bg2')];
+  const infoEl = document.getElementById('info');
+  const loadEl = document.getElementById('loading');
+  const errEl = document.getElementById('error');
+  let active = 0, idx = 0, timer = null, infoTimer = null, images = [];
+
+  // ── 设置过渡时间（CSS 和 JS 同步）──
+  bg.forEach(el => el.style.transitionDuration = FADE + 'ms');
+
+  // ── CORS 代理拉 Bing 元数据 ──
+  // Bing API 本身拒绝浏览器直连（无 CORS 头），走代理
+  const BING = `https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=${COUNT}&mkt=${REGION}`;
+  const PROXIES = [
+    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+    u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  ];
+
+  async function fetchImages() {
+    const errs = [];
+    for (const wrap of PROXIES) {
+      try {
+        const r = await fetch(wrap(BING), { cache: 'no-store' });
+        if (!r.ok) { errs.push(`${r.status}`); continue; }
+        const d = await r.json();
+        if (d && Array.isArray(d.images) && d.images.length) return d.images;
+      } catch (e) { errs.push(e.message); }
+    }
+    // 兜底：localStorage 缓存
+    try {
+      const c = localStorage.getItem('ss_imgs');
+      if (c) { const d = JSON.parse(c); if (d.length) return d; }
+    } catch (e) {}
+    throw new Error('代理全部失败: ' + errs.join('; '));
+  }
+
+  function imageUrl(img) {
+    if (img.urlbase)
+      return 'https://www.bing.com' + img.urlbase + '_UHD.jpg';
+    return 'https://www.bing.com' + img.url;
+  }
+
+  function applyBg(el, url) {
+    el.style.backgroundImage = 'url("' + url.replace(/"/g, '\\"') + '")';
+  }
+
+  function showAt(i) {
+    if (!images.length) return;
+    const img = images[((i % images.length) + images.length) % images.length];
+    const url = imageUrl(img);
+    const next = 1 - active;
+
+    // 预加载 → 切换
+    const imgLoader = new Image();
+    imgLoader.onload = () => {
+      applyBg(bg[next], url);
+      bg[next].classList.add('show');
+      bg[active].classList.remove('show');
+      active = next;
+    };
+    imgLoader.onerror = () => setTimeout(() => showAt(i + 1), 5000);
+    imgLoader.src = url;
+
+    // 显示版权信息
+    if (SHOW_INFO) {
+      const date = img.startdate || '';
+      const cp = (img.copyright || '').trim();
+      const html = (date ? `<span class="date">${date}</span>` : '') + (cp ? `<span>${cp}</span>` : '');
+      if (html) {
+        infoEl.innerHTML = html;
+        infoEl.classList.add('show');
+        clearTimeout(infoTimer);
+        infoTimer = setTimeout(() => infoEl.classList.remove('show'), INFO_MS);
+      }
+    }
+  }
+
+  function next() { idx++; showAt(idx); }
+
+  // ── 启动 ──
+  (async () => {
+    try {
+      images = await fetchImages();
+      localStorage.setItem('ss_imgs', JSON.stringify(images));
+      loadEl.classList.add('hide');
+      showAt(0);
+      timer = setInterval(next, INTERVAL);
+    } catch (e) {
+      loadEl.classList.add('hide');
+      errEl.style.display = 'flex';
+      errEl.textContent = '壁纸加载失败: ' + e.message;
+    }
+  })();
+
+  // ── 鼠标闲置隐藏光标 ──
+  let curTimer = null;
+  document.addEventListener('mousemove', () => {
+    document.body.classList.remove('idle');
+    clearTimeout(curTimer);
+    curTimer = setTimeout(() => document.body.classList.add('idle'), CURSOR_IDLE);
+  }, { passive: true });
+})();
+</script>
+</body>
+</html>
